@@ -43,15 +43,15 @@ pub fn parse_command(text: String) -> anyhow::Result<InputCommand> {
         anyhow::bail!("incorrect arguments!");
     }
 
-    let text = text.trim().to_lowercase();
-    let mut arguments: Vec<&str> = text.split(" ").collect();
-    let command = arguments.remove(0);
+    let text = text.trim();
+    let mut arguments: Vec<&str> = text.split_whitespace().collect();
+    let command = arguments.remove(0).to_lowercase();
 
     if arguments.len() > 2 {
         anyhow::bail!("incorrect amount of arguments!");
     }
 
-    match command {
+    match command.as_str() {
         "get" => {
             if arguments.len() != 1 {
                 anyhow::bail!(
@@ -90,8 +90,6 @@ pub fn parse_command(text: String) -> anyhow::Result<InputCommand> {
 
         "list" => Ok(InputCommand::List),
 
-        _ => {
-            anyhow::bail!("this shouldn't happen. idk how you got here. wrong operation!");
-        }
+        _ => anyhow::bail!("unknown command: '{command}'"),
     }
 }

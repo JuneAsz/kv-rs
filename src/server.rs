@@ -28,8 +28,16 @@ pub fn handle_client(
             break;
         }
 
-        let command = parse_command(buf.clone())?;
-        command.execute(Arc::clone(&store), &mut writer)?;
+        match parse_command(buf.clone()) {
+            Ok(command) => {
+                if let Err(e) = command.execute(Arc::clone(&store), &mut writer) {
+                    writeln!(writer, "ERR: {e}")?;
+                }
+            }
+            Err(e) => {
+                writeln!(writer, "ERR: {e}")?;
+            }
+        }
 
         writer.flush()?;
     }
