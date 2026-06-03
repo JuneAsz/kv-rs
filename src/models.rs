@@ -47,10 +47,6 @@ pub fn parse_command(text: String) -> anyhow::Result<InputCommand> {
     let mut arguments: Vec<&str> = text.split_whitespace().collect();
     let command = arguments.remove(0).to_lowercase();
 
-    if arguments.len() > 2 {
-        anyhow::bail!("incorrect amount of arguments!");
-    }
-
     match command.as_str() {
         "get" => {
             if arguments.len() != 1 {
@@ -64,17 +60,17 @@ pub fn parse_command(text: String) -> anyhow::Result<InputCommand> {
         }
 
         "set" => {
-            if arguments.len() != 2 {
+            if arguments.len() < 2 {
                 anyhow::bail!(
                     "wrong argument count for 'SET' operation. expected: 2, found: {}",
                     arguments.len()
                 )
             }
 
-            Ok(InputCommand::Set(
-                arguments[0].to_string(),
-                arguments[1].to_string(),
-            ))
+            let key = arguments.remove(0);
+            let val = arguments.join(" ");
+
+            Ok(InputCommand::Set(key.to_string(), val))
         }
 
         "del" => {
