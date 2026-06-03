@@ -35,7 +35,7 @@ pub fn get_v(store: Arc<Mutex<HashMap<String, String>>>, k: String) -> anyhow::R
     if let Some(val) = map.get(&k) {
         Ok(val.clone())
     } else {
-        anyhow::bail!("key not found!");
+        Ok(String::from("key dont exist"))
     }
 }
 

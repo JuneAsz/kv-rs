@@ -1,11 +1,20 @@
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::TcpStream;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use kv_rs::ADDR;
 
 #[derive(Parser)]
-enum Cli {
+struct Cli {
+    #[arg(short)]
+    interactive: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum Commands {
     Get { key: String },
     Set { key: String, value: String },
     Del { key: String },
@@ -34,28 +43,67 @@ fn send_list(w: &mut impl Write, r: &mut impl BufRead) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+fn repl_connect() -> anyhow::Result<()> {
+    let stream = TcpStream::connect(ADDR)?;
+    let write_stream = stream.try_clone()?;
+
+    let mut reader = BufReader::new(stream);
+    let mut writer = BufWriter::new(write_stream);
+    let mut buf = String::new();
+
+    println!("Commands: get, set, list, del. \n q to quit.");
+    loop {
+        buf.clear();
+        std::io::stdin().read_line(&mut buf)?;
+
+        if buf.trim() == "q" {
+            break;
+        }
+
+        if buf.trim() == "list" {
+            send_list(&mut writer, &mut reader)?;
+            buf.clear();
+        } else {
+            if !buf.trim().is_empty() {
+                let answer = send_command(&mut writer, &mut reader, buf.trim().to_string())?;
+                println!("{answer}");
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    if cli.interactive {
+        repl_connect()?;
+        return Ok(());
+    }
+
     let r_stream = TcpStream::connect(ADDR)
         .map_err(|_| anyhow::anyhow!("couldn't connect to server at {ADDR} - is it running?"))?;
     let w_stream = r_stream.try_clone()?;
     let mut reader = BufReader::new(r_stream);
     let mut writer = BufWriter::new(w_stream);
 
-    match cli {
-        Cli::Get { key } => println!(
+    match cli.command {
+        Some(Commands::Get { key }) => println!(
             "{}",
             send_command(&mut writer, &mut reader, format!("GET {key}"))?
         ),
-        Cli::Set { key, value } => println!(
+        Some(Commands::Set { key, value }) => println!(
             "{}",
             send_command(&mut writer, &mut reader, format!("SET {key} {value}"))?
         ),
-        Cli::Del { key } => println!(
+        Some(Commands::Del { key }) => println!(
             "{}",
             send_command(&mut writer, &mut reader, format!("DEL {key}"))?
         ),
-        Cli::List => send_list(&mut writer, &mut reader)?,
+        Some(Commands::List) => send_list(&mut writer, &mut reader)?,
+        None => {}
     }
 
     Ok(())
