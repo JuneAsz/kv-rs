@@ -8,7 +8,7 @@ A simple in-memory key-value store server written in Rust. Work in progress.
 cargo run
 ```
 
-Server listens on `127.0.0.1:7878`. Connect with `nc` or `telnet`:
+Server listens on `127.0.0.1:7878`. Connect with `nc` or `telnet`: OR use the client. ```kvc set foo bar```
 
 ```bash
 nc 127.0.0.1 7878
