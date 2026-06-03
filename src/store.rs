@@ -54,3 +54,43 @@ pub fn print_kvs(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_and_get() {
+        let store = init_store();
+        let mut sink = std::io::sink();
+        set_kv(
+            Arc::clone(&store),
+            "foo".to_string(),
+            "bar".to_string(),
+            &mut sink,
+        )
+        .unwrap();
+        assert_eq!(get_v(Arc::clone(&store), "foo".to_string()).unwrap(), "bar");
+    }
+
+    #[test]
+    fn test_get_missing_key() {
+        let store = init_store();
+        assert!(get_v(Arc::clone(&store), "nonexistent".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_del() {
+        let store = init_store();
+        let mut sink = std::io::sink();
+        set_kv(
+            Arc::clone(&store),
+            "foo".to_string(),
+            "bar".to_string(),
+            &mut sink,
+        )
+        .unwrap();
+        del_kv(Arc::clone(&store), "foo".to_string(), &mut sink).unwrap();
+        assert!(get_v(Arc::clone(&store), "foo".to_string()).is_err());
+    }
+}
