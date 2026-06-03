@@ -2,22 +2,26 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::{TcpListener, TcpStream};
 
+use std::fs::File;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::models::parse_command;
-
-const ADDR: &str = "127.0.0.1:7878";
+use crate::log::write_to_log;
+use crate::models::{InputCommand, parse_command};
+use kv_rs::ADDR;
 
 pub fn handle_client(
     stream: TcpStream,
     store: Arc<Mutex<HashMap<String, String>>>,
+    log: Arc<Mutex<File>>,
 ) -> anyhow::Result<()> {
     let write_stream = stream.try_clone()?;
-
+    let addr = stream.peer_addr()?;
     let mut reader = BufReader::new(stream);
     let mut writer = BufWriter::new(write_stream);
     let mut buf = String::new();
+
+    println!("client connected: {}", addr);
 
     loop {
         buf.clear();
@@ -29,11 +33,18 @@ pub fn handle_client(
         }
 
         match parse_command(buf.clone()) {
-            Ok(command) => {
-                if let Err(e) = command.execute(Arc::clone(&store), &mut writer) {
+            Ok(command) => match command.execute(Arc::clone(&store), &mut writer) {
+                Ok(_) => match command {
+                    InputCommand::Set(_, _) | InputCommand::Del(_) => {
+                        write_to_log(Arc::clone(&log), buf.clone())?
+                    }
+
+                    _ => {}
+                },
+                Err(e) => {
                     writeln!(writer, "ERR: {e}")?;
                 }
-            }
+            },
             Err(e) => {
                 writeln!(writer, "ERR: {e}")?;
             }
@@ -42,10 +53,15 @@ pub fn handle_client(
         writer.flush()?;
     }
 
+    println!("client: {} disconnected.", addr);
+
     Ok(())
 }
 
-pub fn serve(store: Arc<Mutex<HashMap<String, String>>>) -> anyhow::Result<()> {
+pub fn serve(
+    store: Arc<Mutex<HashMap<String, String>>>,
+    log: Arc<Mutex<File>>,
+) -> anyhow::Result<()> {
     let listener = TcpListener::bind(ADDR)?;
 
     for stream in listener.incoming() {
@@ -58,8 +74,9 @@ pub fn serve(store: Arc<Mutex<HashMap<String, String>>>) -> anyhow::Result<()> {
         };
 
         let sc = Arc::clone(&store);
+        let lc = Arc::clone(&log);
         thread::spawn(move || {
-            if let Err(e) = handle_client(stream, sc) {
+            if let Err(e) = handle_client(stream, sc, lc) {
                 eprintln!("client error: {e}");
             }
         });
