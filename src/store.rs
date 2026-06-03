@@ -50,5 +50,7 @@ pub fn print_kvs(
         writeln!(w, "{k}:{v}")?;
     }
 
+    writeln!(w)?;
+
     Ok(())
 }
