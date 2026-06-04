@@ -84,3 +84,79 @@ pub fn serve(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::init_store;
+    use std::io::{BufRead, BufReader, BufWriter, Write};
+    use std::net::TcpStream;
+
+    fn start_test_server() -> std::net::SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let store = init_store();
+        let log = crate::log::init_log(std::path::PathBuf::from(format!(
+            "test_{}.log",
+            addr.port()
+        )))
+        .unwrap();
+
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let stream = stream.unwrap();
+                let sc = Arc::clone(&store);
+                let lc = Arc::clone(&log);
+                thread::spawn(move || {
+                    handle_client(stream, sc, lc).ok();
+                });
+            }
+        });
+
+        addr
+    }
+
+    #[test]
+    fn test_set_and_get() {
+        let addr = start_test_server();
+        let stream = TcpStream::connect(addr).unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut writer = BufWriter::new(stream);
+
+        writeln!(writer, "SET foo bar").unwrap();
+        writer.flush().unwrap();
+        let mut buf = String::new();
+        reader.read_line(&mut buf).unwrap();
+        assert!(buf.contains("foo"));
+
+        buf.clear();
+        writeln!(writer, "GET foo").unwrap();
+        writer.flush().unwrap();
+        reader.read_line(&mut buf).unwrap();
+        assert_eq!(buf.trim(), "bar");
+    }
+
+    #[test]
+    fn test_del() {
+        let addr = start_test_server();
+        let stream = TcpStream::connect(addr).unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut writer = BufWriter::new(stream);
+
+        writeln!(writer, "SET foo bar").unwrap();
+        writer.flush().unwrap();
+        let mut buf = String::new();
+        reader.read_line(&mut buf).unwrap();
+
+        buf.clear();
+        writeln!(writer, "DEL foo").unwrap();
+        writer.flush().unwrap();
+        reader.read_line(&mut buf).unwrap();
+
+        buf.clear();
+        writeln!(writer, "GET foo").unwrap();
+        writer.flush().unwrap();
+        reader.read_line(&mut buf).unwrap();
+        assert!(buf.contains("ERR"));
+    }
+}
