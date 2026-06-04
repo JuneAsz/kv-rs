@@ -134,6 +134,8 @@ mod tests {
         writer.flush().unwrap();
         reader.read_line(&mut buf).unwrap();
         assert_eq!(buf.trim(), "bar");
+
+        std::fs::remove_file(format!("test_{}.log", addr.port())).ok();
     }
 
     #[test]
@@ -158,5 +160,7 @@ mod tests {
         writer.flush().unwrap();
         reader.read_line(&mut buf).unwrap();
         assert!(buf.contains("ERR"));
+
+        std::fs::remove_file(format!("test_{}.log", addr.port())).ok();
     }
 }
